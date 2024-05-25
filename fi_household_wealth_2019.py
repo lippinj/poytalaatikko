@@ -18,13 +18,52 @@ DATA_2019 = [
     (278_681, 1_065_204,   606_702,   766_220, 1_088_466),
 ]
 
+# Kertoimet EKP:n DWA-datasta välillä 2019-Q3 -> 2023-Q3
+MULTIPLIERS_2023_2019 = [
+    # B50
+    1.4782,
+    1.4782,
+    1.4782,
+    1.4782,
+    1.4782,
+    # D6
+    1.3291,
+    # D7
+    1.3113,
+    # D8
+    1.2932,
+    # D9
+    1.2834,
+    # D10
+    1.2108,
+]
 
-def WealthStats():
+
+def wealth_stats(data):
     builder = PiecewiseLinearBuilder()
-    for count, mean, p25, p50, p75 in DATA_2019:
+    for count, mean, p25, p50, p75 in data:
         segments = [(0.25, p25), (0.50, p50), (0.75, p75)]
         builder.segment(count, mean, segments)
     return builder.build_optimized()
+
+
+def wealth_stats_2019():
+    return wealth_stats(DATA_2019)
+
+
+def wealth_stats_2023():
+    data_2023 = [
+        (
+            count,
+            mul * mean,
+            mul * p25,
+            mul * p50,
+            mul * p75
+        )
+        for mul, (count, mean, p25, p50, p75)
+        in zip(MULTIPLIERS_2023_2019, DATA_2019)
+    ]
+    return wealth_stats(data_2023)
 
 
 def report_wealth_stats(stats):
@@ -37,20 +76,26 @@ def report_wealth_stats(stats):
     print(f"Nettovarallisuus yhteensä, ≥ 1 000 000: {stats.band_sum(1_000_000)*1e-9:5.0f} mrd.")
 
 
-def plot_wealth_stats(axs, stats):
+def plot_wealth_stats(axs, stats, label):
     n = 25
 
-    axs[0].plot(stats.xp[:n] / 1e3, stats.yp[:n] / 1e3, linewidth = 1, marker = ".")
+    axs[0].plot(stats.xp[:n] / 1e3, stats.yp[:n] / 1e3, linewidth = 1, marker = ".", label = label)
     axs[0].set_xlabel("Kotitalous (1 000)")
     axs[0].set_ylabel("Nettovarallisuus (t. eur)")
     axs[0].autoscale(enable=True, axis="x", tight=True)
-    axs[0].grid()
+    axs[0].grid(True)
 
-    axs[1].plot(stats.xp[n:] / 1e3, stats.yp[n:] / 1e6, linewidth = 1, marker = ".")
+    if label:
+        axs[0].legend()
+
+    axs[1].plot(stats.xp[n:] / 1e3, stats.yp[n:] / 1e6, linewidth = 1, marker = ".", label = label)
     axs[1].set_xlabel("Kotitalous (1 000)")
     axs[1].set_ylabel("Nettovarallisuus (milj. eur)")
     axs[1].autoscale(enable=True, axis="x", tight=True)
-    axs[1].grid()
+    axs[1].grid(True)
+
+    if label:
+        axs[1].legend()
 
 
 def report_wealth_tax(tax):
