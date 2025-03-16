@@ -27,12 +27,27 @@ class Data151v:
         return ["D1-5", "D6", "D7", "D8", "D9", "D10"]
 
     def __call__(self, v=None, d="SS", l="n", t="nm"):
+        if l.endswith("--"):
+            x = self(v, d, l[:-2], t)
+            a6 = self(v, d, "a6", t)
+            a3 = self(v, d, "a3", t)
+            return x - a6 - a3
+        if l.endswith("-"):
+            x = self(v, d, l[:-1], t)
+            a6 = self(v, d, "a6", t)
+            return x - a6
         if t == "nt":
-            return self(v, d, l, "nm") * self(v, d, l, "hn")
+            x = self(v, d, l, "nm")
+            w = self(v, d, l, "hn")
+            return x * w
         if t == "rt":
-            return self(v, d, l, "rm") * self(v, d, l, "hn")
+            x = self(v, d, l, "rm")
+            w = self(v, d, l, "hn")
+            return x * w
         if t == "szt":
-            return self(v, d, l, "hsz") * self(v, d, l, "hn")
+            x = self(v, d, l, "hsz")
+            w = self(v, d, l, "hn")
+            return x * w
 
         v, d, l, t = self.table.expand(v, d, l, t)
 
@@ -62,3 +77,17 @@ class Data151v:
         all = self.h("SS", l, t)
         top = self.h(d, l, t)
         return c * top / all
+
+    def fmeanr(self, mul=1e3):
+        return lambda d, l: self._f(d, l, "rm", mul)
+
+    def ftotalr(self, mul=1e9):
+        return lambda d, l: self._f(d, l, "rt", mul)
+
+    def ftotaln(self, mul=1e9):
+        return lambda d, l: self._f(d, l, "nt", mul)
+
+    def _f(self, d, l, t, mul):
+        y = self.h(d, l, t) / mul
+        y[y == 0] = np.nan
+        return y

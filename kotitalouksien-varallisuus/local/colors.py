@@ -6,12 +6,12 @@ def _hsv(h, s, v, a=1.0):
 
 
 def _colors6(vals):
-    keys = ["D1-5", "D6", "D7", "D8", "D9", "D10"]
+    keys = ["D1-5", "D6", "D7", "D8", "D9", "D10", "SS"]
     return {k: v for k, v in zip(keys, vals)}
 
 
 def colors6(s=1, v=0.75, r=0.12):
-    return _colors6([_hsv(r * t, s, v) for t in range(6)])
+    return _colors6([_hsv(r * t, s, v) for t in range(6)] + [(0, 0, 0, 0.25)])
 
 
 def colors6b():
@@ -23,6 +23,7 @@ def colors6b():
             "seagreen",  # D8
             "dodgerblue",  # D9
             "mediumblue",  # D10
+            (0, 0, 0, 0.25),  # SS
         ]
     )
 

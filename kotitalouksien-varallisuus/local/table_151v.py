@@ -90,11 +90,18 @@ class Table151v:
         return vuosi, desiili, varallisuuslaji, tieto
 
     def label_varallisuuslaji(self, v):
+        suffix = ""
+        if v.endswith("--"):
+            v = v[:-2]
+            suffix = ", pl. muut osakkeet, metsät, pellot ja yritysvarallisuus"
+        if v.endswith("-"):
+            v = v[:-1]
+            suffix = ", pl. muut osakkeet"
         v = Table151v.varallisuuslaji(v)
         df = self.table.values["Varallisuuslaji"]
         df = df[df.code == v]
         assert len(df) == 1, v
-        return df.iloc[0].text
+        return df.iloc[0].text + suffix
 
     @staticmethod
     def varallisuuslaji(v):
