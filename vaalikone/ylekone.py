@@ -1,5 +1,7 @@
 import pathlib
 import json
+from collections import defaultdict
+
 import requests
 
 
@@ -26,10 +28,10 @@ class Api:
             return j
 
     def constituencies(self):
-        return self.fetch("municipality/constituencies")
+        return self.fetch_cached("municipality/constituencies")
 
     def parties(self, constituency_id):
-        return self.fetch(f"municipality/constituencies/{constituency_id}/parties")
+        return self.fetch_cached(f"municipality/constituencies/{constituency_id}/parties")
 
     def candidate(self, constituency_id, candidate_id):
         return self.fetch_cached(
@@ -42,7 +44,7 @@ class Api:
         )
 
     def questions(self, constituency_id):
-        return self.fetch(f"municipality/constituencies/{constituency_id}/questions")
+        return self.fetch_cached(f"municipality/constituencies/{constituency_id}/questions")
 
 
 class Vaalikone:
@@ -116,6 +118,12 @@ class Municipality:
                     return j_question["text_fi"]
         return None
 
+    def party_id_to_name(self, id):
+        for j in self.j_parties:
+            if j["id"] == id:
+                return j["name_fi"]
+        return None
+
     def party_id_to_short_name(self, id):
         for j in self.j_parties:
             if j["id"] == id:
@@ -168,6 +176,10 @@ class Candidate:
         return self.j_candidate["party_id"]
 
     @property
+    def party(self):
+        return self.parent.party_id_to_name(self.party_id)
+
+    @property
     def party_short(self):
         return self.parent.party_id_to_short_name(self.party_id)
 
@@ -175,5 +187,95 @@ class Candidate:
     def answers_dict(self):
         return {int(k): v["answer"] for k, v in self.j_candidate["answers"].items()}
 
+    @property
+    def answers(self):
+        for id, j in self.j_candidate["answers"].items():
+            yield int(id), j["answer"], j
+
     def __repr__(self):
         return f"<{self.id}:{self.name} ({self.party_short})>"
+
+
+class Stat:
+    def __init__(self):
+        self._respondents_agree = []
+        self._respondents_somewhat_agree = []
+        self._respondents_somewhat_disagree = []
+        self._respondents_disagree = []
+
+    def __repr__(self):
+        return f"<Stat:{self.dd}:{self.d}:{self.a}:{self.aa}>"
+
+    @property
+    def num_agree(self):
+        return len(self._respondents_agree)
+
+    @property
+    def num_somewhat_agree(self):
+        return len(self._respondents_somewhat_agree)
+
+    @property
+    def num_somewhat_disagree(self):
+        return len(self._respondents_somewhat_disagree)
+
+    @property
+    def num_disagree(self):
+        return len(self._respondents_disagree)
+
+    @property
+    def dd(self):
+        return self.num_disagree
+
+    @property
+    def d(self):
+        return self.num_somewhat_disagree
+
+    @property
+    def a(self):
+        return self.num_agree
+
+    @property
+    def aa(self):
+        return self.num_somewhat_agree
+
+    @property
+    def num_total(self):
+        return self.aa + self.a + self.d + self.dd
+
+    @property
+    def n(self):
+        return self.num_total
+
+    @property
+    def mean(self):
+        return (
+            (-3 * self.dd) + (-1 * self.d) + (+1 * self.a) + (+3 * self.aa)
+        ) / self.n
+
+    @property
+    def mean2(self):
+        return ((9 * self.dd) + (1 * self.d) + (1 * self.a) + (9 * self.aa)) / self.n
+
+    @property
+    def var(self):
+        return self.mean2 - self.mean**2
+
+    def add(self, answer, respondent):
+        if answer == 1:
+            self._respondents_disagree.append(respondent)
+        elif answer == 2:
+            self._respondents_somewhat_disagree.append(respondent)
+        elif answer == 4:
+            self._respondents_somewhat_agree.append(respondent)
+        elif answer == 5:
+            self._respondents_agree.append(respondent)
+        else:
+            raise RuntimeError()
+
+
+def make_stats(municipality):
+    stats = defaultdict(lambda: defaultdict(Stat))
+    for candidate in municipality.candidates:
+        for qid, answer, _ in candidate.answers:
+            stats[qid][candidate.party].add(answer, candidate)
+    return stats
