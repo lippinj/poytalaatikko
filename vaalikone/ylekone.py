@@ -3,6 +3,7 @@ import json
 from collections import defaultdict
 
 import requests
+import numpy as np
 
 
 class Api:
@@ -31,7 +32,9 @@ class Api:
         return self.fetch_cached("municipality/constituencies")
 
     def parties(self, constituency_id):
-        return self.fetch_cached(f"municipality/constituencies/{constituency_id}/parties")
+        return self.fetch_cached(
+            f"municipality/constituencies/{constituency_id}/parties"
+        )
 
     def candidate(self, constituency_id, candidate_id):
         return self.fetch_cached(
@@ -44,7 +47,9 @@ class Api:
         )
 
     def questions(self, constituency_id):
-        return self.fetch_cached(f"municipality/constituencies/{constituency_id}/questions")
+        return self.fetch_cached(
+            f"municipality/constituencies/{constituency_id}/questions"
+        )
 
 
 class Vaalikone:
@@ -198,13 +203,18 @@ class Candidate:
 
 class Stat:
     def __init__(self):
+        self.party = None
         self._respondents_agree = []
         self._respondents_somewhat_agree = []
         self._respondents_somewhat_disagree = []
         self._respondents_disagree = []
 
     def __repr__(self):
-        return f"<Stat:{self.dd}:{self.d}:{self.a}:{self.aa}>"
+        return f"<Stat {self.party} {self.dd}/{self.d}/{self.a}/{self.aa}>"
+
+    @property
+    def prettystr(self):
+        return f"{self.party:>8} | ⮇:{self.dd:<3} ⭣:{self.d:<3} ⭡:{self.a:<3} ⮅:{self.aa:<3} | μ:{self.mean:<+5.2f} σ:{self.std:<+5.2f}"
 
     @property
     def num_agree(self):
@@ -249,16 +259,26 @@ class Stat:
     @property
     def mean(self):
         return (
-            (-3 * self.dd) + (-1 * self.d) + (+1 * self.a) + (+3 * self.aa)
-        ) / self.n
+            ((-3 * self.dd) + (-1 * self.d) + (+1 * self.a) + (+3 * self.aa)) / self.n
+            if self.n
+            else 0
+        )
 
     @property
     def mean2(self):
-        return ((9 * self.dd) + (1 * self.d) + (1 * self.a) + (9 * self.aa)) / self.n
+        return (
+            ((9 * self.dd) + (1 * self.d) + (1 * self.a) + (9 * self.aa)) / self.n
+            if self.n
+            else 0
+        )
 
     @property
     def var(self):
         return self.mean2 - self.mean**2
+
+    @property
+    def std(self):
+        return np.sqrt(self.mean2 - self.mean**2)
 
     def add(self, answer, respondent):
         if answer == 1:
@@ -277,5 +297,7 @@ def make_stats(municipality):
     stats = defaultdict(lambda: defaultdict(Stat))
     for candidate in municipality.candidates:
         for qid, answer, _ in candidate.answers:
-            stats[qid][candidate.party].add(answer, candidate)
+            stat = stats[qid][candidate.party_short]
+            stat.party = stat.party or candidate.party_short
+            stat.add(answer, candidate)
     return stats
