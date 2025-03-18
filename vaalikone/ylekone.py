@@ -1,3 +1,5 @@
+import pathlib
+import json
 import requests
 
 
@@ -5,14 +7,23 @@ class Api:
     def __init__(self, vaalit="alue-ja-kuntavaalit2025"):
         self.vaalit = vaalit
         self.baseurl = f"https://vaalit.yle.fi/vaalikone/{vaalit}/api/public"
-
-    def url(self, s):
-        return f"{self.baseurl}/{s}"
+        pathlib.Path(".ylekone-cache").mkdir(exist_ok=True)
 
     def fetch(self, s):
-        url = self.url(s)
+        url = f"{self.baseurl}/{s}"
         headers = dict(Accept="application/json")
         return requests.get(url, headers=headers).json()
+
+    def fetch_cached(self, s):
+        cache_path = f".ylekone-cache/{s.replace('/','-')}.json"
+        try:
+            with open(cache_path, "r") as f:
+                return json.load(f)
+        except:
+            j = self.fetch(s)
+            with open(cache_path, "w") as f:
+                json.dump(j, f, indent=4)
+            return j
 
     def constituencies(self):
         return self.fetch("municipality/constituencies")
@@ -21,10 +32,14 @@ class Api:
         return self.fetch(f"municipality/constituencies/{constituency_id}/parties")
 
     def candidate(self, constituency_id, candidate_id):
-        return self.fetch(f"municipality/constituencies/{constituency_id}/candidates/{candidate_id}")
+        return self.fetch_cached(
+            f"municipality/constituencies/{constituency_id}/candidates/{candidate_id}"
+        )
 
     def candidates(self, constituency_id):
-        return self.fetch(f"municipality/constituencies/{constituency_id}/candidates")
+        return self.fetch_cached(
+            f"municipality/constituencies/{constituency_id}/candidates"
+        )
 
     def questions(self, constituency_id):
         return self.fetch(f"municipality/constituencies/{constituency_id}/questions")
@@ -158,7 +173,7 @@ class Candidate:
 
     @property
     def answers_dict(self):
-        return {int(k):v["answer"] for k,v in self.j_candidate["answers"].items()}
+        return {int(k): v["answer"] for k, v in self.j_candidate["answers"].items()}
 
     def __repr__(self):
         return f"<{self.id}:{self.name} ({self.party_short})>"
