@@ -2,6 +2,7 @@ import statfin
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import torch
 
 
 COLORS = ["k", "k", "b", "k", "k", "r", "k", "k", "b", "k", "k"]
@@ -9,11 +10,29 @@ COLORS = ["k", "k", "b", "k", "k", "r", "k", "k", "b", "k", "k"]
 
 class Row:
     def __init__(self, row):
-        self.p = np.array([0.10, 0.20, 0.25, 0.30, 0.40, 0.50, 0.60, 0.70, 0.75, 0.80, 0.90])
-        self.v = np.array([row.P10, row.P20, row.Q1, row.P30, row.P40, row.P50, row.P60, row.P70, row.Q3, row.P80, row.P90])
+        self.p = np.array(
+            [0.10, 0.20, 0.25, 0.30, 0.40, 0.50, 0.60, 0.70, 0.75, 0.80, 0.90]
+        )
+        self.v = np.array(
+            [
+                row.P10,
+                row.P20,
+                row.Q1,
+                row.P30,
+                row.P40,
+                row.P50,
+                row.P60,
+                row.P70,
+                row.Q3,
+                row.P80,
+                row.P90,
+            ]
+        )
         self.m = row.Mean
         self.N = row.N
         self.raw = row
+        self.sum = row.Sum
+        self.fractiles = [(float(p), float(v)) for p, v in zip(self.p, self.v)]
 
     @property
     def P(self):
@@ -63,15 +82,18 @@ class Row:
 
 
 class Data:
-    def __init__(self, e = "HVT_TULOT_50"):
+    def __init__(self, e="HVT_TULOT_50"):
         self.db = statfin.PxWebAPI.Verohallinto()
         self.table = self.db.table("Vero", "tulot_101.px")
-        self.df = self.table.query({
-            "Verovuosi": "2023",
-            "Erä": e,
-            "Tulonsaajaryhmä": "Y",
-            "Tuloluokka": "*",
-        }, cache="tulot_101.px")
+        self.df = self.table.query(
+            {
+                "Verovuosi": "2023",
+                "Erä": e,
+                "Tulonsaajaryhmä": "Y",
+                "Tuloluokka": "*",
+            },
+            cache="tulot_101.px",
+        )
 
     def income_class_name(self, code):
         df = self.table.values["Tuloluokka"]
@@ -113,8 +135,8 @@ class Chunk:
                 return t * 100.0 + (1 - t) * self.row.P[-1]
             else:
                 i = np.searchsorted(self.row.v, x) - 1
-                t = (x - self.row.v[i]) / (self.row.v[i+1] - self.row.v[i])
-                return t * self.row.P[i+1] + (1 - t) * self.row.P[i]
+                t = (x - self.row.v[i]) / (self.row.v[i + 1] - self.row.v[i])
+                return t * self.row.P[i + 1] + (1 - t) * self.row.P[i]
 
     def density(self, x):
         try:
@@ -163,8 +185,8 @@ class Chunk:
                 return t * 100.0 + (1 - t) * self.row.P[-1]
             else:
                 i = np.searchsorted(self.row.v, x) - 1
-                t = (x - self.row.v[i]) / (self.row.v[i+1] - self.row.v[i])
-                return t * self.row.P[i+1] + (1 - t) * self.row.P[i]
+                t = (x - self.row.v[i]) / (self.row.v[i + 1] - self.row.v[i])
+                return t * self.row.P[i + 1] + (1 - t) * self.row.P[i]
 
     def density(self, x):
         try:
@@ -189,15 +211,38 @@ def autolims(row):
     return vmin, vmax
 
 
-def plot_cumulative_2(ax, chunk, plot_ext = True):
+def plot_cumulative_2(ax, chunk, plot_ext=True):
     row = chunk.row
     x = chunk.x_interior()
     ax.plot(x, chunk.cumulative(x), linestyle=":", color="k")
     ax.plot(row.v, row.P, linewidth=0, marker=".", color="k")
-    ax.plot([row.v[2], row.v[8]], [row.P[2], row.P[8]], linewidth=0, marker=".", color="b", markersize=8)
+    ax.plot(
+        [row.v[2], row.v[8]],
+        [row.P[2], row.P[8]],
+        linewidth=0,
+        marker=".",
+        color="b",
+        markersize=8,
+    )
     ax.plot([row.v[5]], [row.P[5]], linewidth=0, marker=".", color="r", markersize=10)
-    ax.hlines(y=row.P, xmin=0, xmax=row.v, colors=COLORS, linewidth=1, alpha=0.3, linestyle=":")
-    ax.vlines(x=row.v, ymin=0, ymax=row.P, colors=COLORS, linewidth=1, alpha=0.3, linestyle=":")
+    ax.hlines(
+        y=row.P,
+        xmin=0,
+        xmax=row.v,
+        colors=COLORS,
+        linewidth=1,
+        alpha=0.3,
+        linestyle=":",
+    )
+    ax.vlines(
+        x=row.v,
+        ymin=0,
+        ymax=row.P,
+        colors=COLORS,
+        linewidth=1,
+        alpha=0.3,
+        linestyle=":",
+    )
     ax.axvline(x=row.m, color="g", alpha=0.5)
 
     if plot_ext:
@@ -217,15 +262,40 @@ def plot_cumulative_2(ax, chunk, plot_ext = True):
 
 def plot_cumulative(ax, row, vmin=None, vmax=None):
     ax.plot(row.v, row.P, linestyle=":", marker=".", color="k")
-    ax.plot([row.v[2], row.v[8]], [row.P[2], row.P[8]], linewidth=0, marker=".", color="b", markersize=8)
+    ax.plot(
+        [row.v[2], row.v[8]],
+        [row.P[2], row.P[8]],
+        linewidth=0,
+        marker=".",
+        color="b",
+        markersize=8,
+    )
     ax.plot([row.v[5]], [row.P[5]], linewidth=0, marker=".", color="r", markersize=10)
-    ax.hlines(y=row.P, xmin=0, xmax=row.v, colors=COLORS, linewidth=1, alpha=0.3, linestyle=":")
-    ax.vlines(x=row.v, ymin=0, ymax=row.P, colors=COLORS, linewidth=1, alpha=0.3, linestyle=":")
+    ax.hlines(
+        y=row.P,
+        xmin=0,
+        xmax=row.v,
+        colors=COLORS,
+        linewidth=1,
+        alpha=0.3,
+        linestyle=":",
+    )
+    ax.vlines(
+        x=row.v,
+        ymin=0,
+        ymax=row.P,
+        colors=COLORS,
+        linewidth=1,
+        alpha=0.3,
+        linestyle=":",
+    )
     ax.axvline(x=row.m, color="g", alpha=0.5)
 
     if vmin is not None:
         ax.plot([vmin, row.v[0]], [0, row.P[0]], linestyle=":", color="k", alpha=0.25)
-        ax.plot([row.v[-1], vmax], [row.P[-1], 100], linestyle=":", color="k", alpha=0.25)
+        ax.plot(
+            [row.v[-1], vmax], [row.P[-1], 100], linestyle=":", color="k", alpha=0.25
+        )
         ax.scatter([vmin, vmax], [0, 100], color="k", alpha=0.25, s=10)
     else:
         vmin, vmax = autolims(row)
@@ -239,12 +309,33 @@ def plot_cumulative(ax, row, vmin=None, vmax=None):
 
 def plot_density(ax, row, vmin=None, vmax=None):
     ax.bar(row.a, row.d, width=row.w, align="edge", color="k", alpha=0.25)
-    ax.vlines(x=row.v, ymin=0, ymax=[*row.d, row.d[-1]], colors=COLORS, linewidth=1, linestyle=":")
+    ax.vlines(
+        x=row.v,
+        ymin=0,
+        ymax=[*row.d, row.d[-1]],
+        colors=COLORS,
+        linewidth=1,
+        linestyle=":",
+    )
     ax.axvline(x=row.m, color="g", alpha=0.5)
 
     if vmin is not None:
-        ax.bar([vmin], [row.dl(vmin)], width=row.v[0] - vmin, align="edge", color="k", alpha=0.10)
-        ax.bar([row.v[-1]], [row.dr(vmax)], width=vmax - row.v[-1], align="edge", color="k", alpha=0.10)
+        ax.bar(
+            [vmin],
+            [row.dl(vmin)],
+            width=row.v[0] - vmin,
+            align="edge",
+            color="k",
+            alpha=0.10,
+        )
+        ax.bar(
+            [row.v[-1]],
+            [row.dr(vmax)],
+            width=vmax - row.v[-1],
+            align="edge",
+            color="k",
+            alpha=0.10,
+        )
     else:
         vmin, vmax = autolims(row)
 
@@ -253,3 +344,95 @@ def plot_density(ax, row, vmin=None, vmax=None):
 
     ax.set_xlabel("Total income, euros per year")
     ax.set_ylabel("Density of individuals, €⁻¹")
+
+
+class Segment:
+    def __init__(self, offset: int, begin: int, end: int, lo: float, hi: float | None):
+        self.offset = offset
+        self.begin = begin
+        self.end = end
+        self.lo = lo
+        self.hi = hi
+
+    @property
+    def count(self):
+        return self.end - self.begin
+
+    @property
+    def i(self):
+        return self.offset
+
+    @property
+    def j(self):
+        return self.offset + self.count
+
+    @property
+    def span(self):
+        return self.hi - self.lo if self.hi else None
+
+    @property
+    def base(self):
+        return self.lo * self.count
+
+    @property
+    def implied_step(self):
+        return self.span / (self.count + 1) if self.span else None
+
+    def __repr__(self):
+        return f"<Segment [{self.begin}, {self.end}) {self.lo}..{self.hi}>"
+
+
+class Problem:
+    def __init__(self, count: int, total: float, fractiles: list[tuple[int, float]]):
+        self.count = count
+        self.total = total
+        self.fixpoints = Problem._compute_fixpoints(count, fractiles)
+        self.segments = Problem._compute_segments(count, self.fixpoints)
+        self.fixed_count = len(self.fixpoints)
+        self.fixed_total = np.sum([v for n, v in self.fixpoints])
+        self.base_total = np.sum([seg.base for seg in self.segments])
+        self.free_count = count - self.fixed_count
+        self.free_total = total - self.fixed_total - self.base_total
+
+    @staticmethod
+    def _compute_fixpoints_sparse(
+        count: int, fractiles: list[tuple[int, float]]
+    ) -> list[tuple[int, float]]:
+        result = []
+        for p, v in fractiles:
+            n = p * count
+            if n == round(n):
+                result.append((n, v))
+            else:
+                result.append((int(n), v))
+                result.append((int(n) + 1, v))
+        return result
+
+    @staticmethod
+    def _compute_fixpoints(
+        count: int, fractiles: list[tuple[int, float]]
+    ) -> list[tuple[int, float]]:
+        result = []
+        prevn, prevv = 0, 0
+        for n, v in Problem._compute_fixpoints_sparse(count, fractiles):
+            if v == prevv:
+                for i in range(prevn + 1, n):
+                    result.append((i, v))
+            result.append((n, v))
+            prevn, prevv = n, v
+        return result
+
+    @staticmethod
+    def _compute_segments(
+        count: int, fixpoints: list[tuple[int, float]]
+    ) -> list[Segment]:
+        result = []
+        i, lo = 0, 0
+        for j, hi in fixpoints:
+            if j > i:
+                offset = 0 if len(result) == 0 else result[-1].j
+                result.append(Segment(offset, i, j, lo, hi))
+            i = j + 1
+            lo = hi
+        result.append(Segment(result[-1].j, i, count, lo, None))
+        return result
