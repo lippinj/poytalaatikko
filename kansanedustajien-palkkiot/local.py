@@ -79,8 +79,8 @@ def plot_ati(ax):
 
 def plot_tulot(ax):
     t, x1, x2 = tulot()
-    ax.plot(t, ind(x1), color="navy", label="Käytettävissä olevat tulot, mediaani")
-    ax.plot(t, ind(x2), color="royalblue", label="Käytettävissä olevat tulot, pienituloisin 10%, keskiarvo")
+    #ax.plot(t, ind(x1), color="navy", label="Käytettävissä olevat tulot, mediaani")
+    ax.plot(t, ind(x2), color="forestgreen", label="Käyt. tulot, pienituloisin 10%, keskiarvo")
 
 
 def plot_bkt_per_capita(ax):
@@ -91,5 +91,5 @@ def plot_bkt_per_capita(ax):
 def plot_palkkiot(ax):
     t, x1, x2, x3 = palkkiot()
     ax.plot(t, ind(x1), color="black", linestyle="-", label="Kansanedustajan palkkio, alle 4 vuotta")
-    ax.plot(t, ind(x2), color="black", linestyle="--", label="Kansanedustajan. palkkio, 4-12 vuotta")
-    ax.plot(t, ind(x3), color="black", linestyle=":", label="Kansanedustajan. palkkio, yli 12 vuotta")
+    ax.plot(t, ind(x2), color="black", linestyle="--", label="Kansanedustajan palkkio, 4-12 vuotta")
+    ax.plot(t, ind(x3), color="black", linestyle=":", label="Kansanedustajan palkkio, yli 12 vuotta")
