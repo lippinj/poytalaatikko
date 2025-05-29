@@ -1,0 +1,6 @@
+axes.grid : False
+axes.titlesize : 10
+axes.prop_cycle : cycler('color', ['black'])
+
+font.family : Liberation Sans
+font.size : 12
