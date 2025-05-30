@@ -1,7 +1,7 @@
 import numpy as np
 from matplotlib.ticker import FuncFormatter
 
-from local.säännöt import enimmäismaksu
+from local import säännöt, tulot
 
 
 def _kformat(x, _):
@@ -61,7 +61,7 @@ def fan_fill(ax, m, labels=False, offset=0.0, alpha_step=0.025):
                 text = "1. lapsi, 311 e/kk"
             else:
                 x = m.x1 + 525
-                text = f"{i}. lapsi, +{enimmäismaksu(i)} e/kk"
+                text = f"{i}. lapsi, +{säännöt.enimmäismaksu(i)} e/kk"
             y = 0.5 * (lo[-1] + hi[-1])
             ax.text(
                 x,
@@ -73,3 +73,34 @@ def fan_fill(ax, m, labels=False, offset=0.0, alpha_step=0.025):
                 va="center",
                 ha="center",
             )
+
+
+def backlines(ax, n, m, h, do_p90=False):
+    assert m in (1, 2)
+
+    yh = m == 1
+    ne = np.arange(n[0] - 1, n[-1] + 2)
+    nn = np.hstack([[x - h/2, x + h/2] for x in ne])
+    ll = np.repeat(säännöt.lapsilisä(ne, yh), 2)
+
+    q1 = m * tulot.q1() + ll
+    md = m * tulot.med() + ll
+    q3 = m * tulot.q3() + ll
+    d9 = m * tulot.d9() + ll
+
+    #ax.axvline(2 * xq1, zorder=-1, color="#999", linestyle=":")
+    #ax.axvline(2 * xmd, zorder=-1, color="#999", linestyle="--")
+    #ax.axvline(2 * xq3, zorder=-1, color="#999", linestyle=":")
+    ax.plot(q1, nn, zorder=-1, color="#999", linestyle=":")
+    ax.plot(md, nn, zorder=-1, color="#999", linestyle="--")
+    ax.plot(q3, nn, zorder=-1, color="#999", linestyle=":")
+    if do_p90:
+        ax.plot(d9, nn, zorder=-1, color="#ccc", linestyle=":")
+
+    xoffset = 100
+    style = dict(size=12, rotation=0, color="#333", va="top", ha="right")
+    ax.text(q1[0] - xoffset, n[0] - 0.62, "$Q_1$", **style, label="")
+    ax.text(md[0] - xoffset, n[0] - 0.62, "$M$", **style)
+    ax.text(q3[0] - xoffset, n[0] - 0.62, "$Q_3$", **style)
+    if do_p90:
+        ax.text(d9[0] - xoffset, n[0] - 0.62, "$P_{90}$", **style)

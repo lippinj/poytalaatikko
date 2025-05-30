@@ -10,11 +10,25 @@ enimmäismaksu0 = 311
 # Matalin perittävä maksu
 maksukynnys = 30
 
+leveys0 = enimmäismaksu0 / maksuprosentti
+leveys1 = maksukynnys / maksuprosentti
+leveys2 = leveys0 - leveys1
+
+
+def lapsilisä(n, yksinhuoltaja=False):
+    """Lapsilisä n lapsesta"""
+    DATA = np.array([94.88, 104.84, 133.79, 173.24, 192.69])
+    korotus = 73.30 if yksinhuoltaja else 0.00
+    x = 0.0 * n
+    for i in range(max(n) + 1):
+        x += (n >= i) * (DATA[np.minimum(i, 4)] + korotus)
+    return x
+
 
 def tuloraja(n):
     """Asiakasmaksun tuloraja, kun perheessä on n jäsentä"""
-    DATA = [None, None, 4066, 5245, 5956, 6667, 7376]
-    return DATA[min(n, 6)] + max(n - 6, 0) * 275
+    DATA = np.array([None, None, 4066, 5245, 5956, 6667, 7376])
+    return DATA[np.minimum(n, 6)] + np.maximum(n - 6, 0) * 275
 
 
 def yläraja(n):
